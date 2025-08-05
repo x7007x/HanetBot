@@ -3,3 +3,4 @@ uvicorn[standard]
 pyTelegramBotAPI[aio]
 redis[asyncio]
 jinja2
+flask
