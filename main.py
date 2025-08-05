@@ -8,7 +8,6 @@ from telebot.types import (
     WebAppInfo,
     Update,
 )
-import asyncio
 import redis
 import json
 
@@ -30,37 +29,7 @@ def get_data(key="bot_data"):
     data = r.get(key)
     if data:
         return json.loads(data)
-    return {
-        "sections": {
-            "علوم الحي": {
-                "message_text": "مرحباً في قسم علوم الحي، اختر موضوعاً:",
-                "keyboard_type": "reply",
-                "buttons": [
-                    {"label": "مقدمة عن الخلية", "action": "send_text", "content": "الخلية هي الوحدة الأساسية للحياة.", "row": 0, "col": 0},
-                    {"label": "أنواع الخلايا", "action": "send_text", "content": "هناك خلايا حيوانية ونباتية.", "row": 0, "col": 1},
-                    {"label": "صورة خلية", "action": "send_photo", "content": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Eukaryotic_cell_structure_ar.svg/1200px-Eukaryotic_cell_structure_ar.svg.png", "row": 1, "col": 0},
-                    {"label": "فيديو عن الخلية", "action": "send_video", "content": "https://file-examples-com.github.io/uploads/2017/04/file_example_MP4_480_1_5MG.mp4", "row": 1, "col": 1},
-                    {"label": "موقع علمي", "action": "url_button", "url": "https://ar.wikipedia.org/wiki/%D8%AE%D9%84%D9%8A%D8%A9", "row": 2, "col": 0},
-                    {"label": "زر تعديل", "action": "edit_message", "content": "تم التعديل من قسم علوم الحي", "row": 3, "col": 0},
-                    {
-                        "label": "زر إرسال نص مع أزرار متقدمة",
-                        "action": "send_text_with_inline_keyboard",
-                        "content": "رسالة نصية مع أزرار متقدمة:",
-                        "row": 3,
-                        "col": 1,
-                        "inline_buttons": [
-                            {"label": "زر 1", "callback": "custom_1", "tg_action": "send_message", "tg_args": {"text": "تم الضغط على زر 1"}},
-                            {"label": "زر 2 إرسال صورة", "callback": "custom_2", "tg_action": "send_photo", "tg_args": {"photo": "https://i.imgur.com/ExdKOOz.png"}},
-                            {"label": "زر رابط", "url": "https://telegram.org"},
-                            {"label": "زر WebApp", "web_app_url": "https://google.com"},
-                            {"label": "زر كود برمجي عادي", "callback": "run_python_code", "py_code": "result = 2 + 2"},
-                            {"label": "زر كود bot", "callback": "run_bot_code", "bot_code": ["send_message", {"text": "الرسالة المرسلة من زر كود bot"}]}
-                        ]
-                    }
-                ]
-            }
-        }
-    }
+    return {}
 
 def update_data(new_data, key="bot_data"):
     r.set(key, json.dumps(new_data))
@@ -97,26 +66,6 @@ def create_inline_keyboard(inline_buttons):
         else:
             kb.add(InlineKeyboardButton(text=btn["label"], callback_data=btn["callback"]))
     return kb
-
-async def execute_py_code(py_code, chat_id):
-    try:
-        local_vars = {}
-        exec(py_code, {}, local_vars)
-        result = local_vars.get("result", "تم تنفيذ الكود بنجاح.")
-        await bot.send_message(chat_id, f"نتيجة تنفيذ الكود: {result}")
-    except Exception as e:
-        await bot.send_message(chat_id, f"خطأ في تنفيذ الكود: {e}")
-
-async def execute_bot_code(bot_code, chat_id):
-    func_name, kwargs = bot_code
-    func = getattr(bot, func_name, None)
-    if func:
-        try:
-            await func(chat_id, **kwargs)
-        except Exception as e:
-            await bot.send_message(chat_id, f"حدث خطأ في تنفيذ إجراء البوت: {e}")
-    else:
-        await bot.send_message(chat_id, "إجراء البوت غير موجود.")
 
 @bot.message_handler(commands=['start'])
 async def start_handler(message):
@@ -166,39 +115,7 @@ async def section_buttons_handler(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 async def callback_handler(call):
-    chat_id = call.message.chat.id
-    message_id = call.message.message_id
-    data_call = call.data
-    data = get_data()
-
-    if data_call == "go_back":
-        await bot.edit_message_text(chat_id=chat_id, message_id=message_id, text="اختر القسم:", reply_markup=None)
-        await bot.send_message(chat_id=chat_id, text="اختر القسم:", reply_markup=create_main_keyboard())
-        await bot.answer_callback_query(call.id)
-        return
-
-    found = False
-    for sec_data in data["sections"].values():
-        for btn in sec_data["buttons"]:
-            inline_buttons = btn.get("inline_buttons", [])
-            for inline_btn in inline_buttons:
-                if inline_btn.get("callback") == data_call:
-                    found = True
-                    py_code = inline_btn.get("py_code")
-                    bot_code = inline_btn.get("bot_code")
-                    if py_code:
-                        await execute_py_code(py_code, chat_id)
-                    elif bot_code:
-                        await execute_bot_code(bot_code, chat_id)
-                    await bot.answer_callback_query(call.id)
-                    break
-            if found:
-                break
-        if found:
-            break
-
-    if not found:
-        await bot.answer_callback_query(call.id)
+    await bot.answer_callback_query(call.id)
 
 @app.get("/", response_class=HTMLResponse)
 async def home():
@@ -229,16 +146,8 @@ async def api_update_data(request: Request):
         if new_data:
             update_data(new_data)
             return JSONResponse(content={"status": "success", "message": "تم تحديث البيانات بنجاح."})
-        return JSONResponse(content={"status": "error", "message": "بيانات غير صالحة"}), 400
+        return JSONResponse(content={"status": "error", "message": "بيانات غير صالحة"}, status_code=400)
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON format")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-async def set_webhook():
-    webhook_url = "https://hanet-bot.vercel.app/webhook"
-    await bot.set_webhook(url=webhook_url)
-
-@app.on_event("startup")
-async def on_startup():
-    await set_webhook()
