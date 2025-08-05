@@ -1,4 +1,6 @@
-from flask import Flask, request, jsonify, render_template
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.templating import Jinja2Templates
 from telebot.async_telebot import AsyncTeleBot
 from telebot.types import (
     ReplyKeyboardMarkup, KeyboardButton,
@@ -10,7 +12,8 @@ import asyncio
 import redis
 import json
 
-app = Flask(__name__)
+app = FastAPI()
+templates = Jinja2Templates(directory="templates")
 
 bot_token = '8038936358:AAF-YxpGmXnoDLHG2sljx3fx79mFye9rwzY'
 bot = AsyncTeleBot(bot_token)
@@ -51,7 +54,7 @@ def get_data(key="bot_data"):
                             {"label": "زر رابط", "url": "https://telegram.org"},
                             {"label": "زر WebApp", "web_app_url": "https://google.com"},
                             {"label": "زر كود برمجي عادي", "callback": "run_python_code", "py_code": "result = 2 + 2"},
-                            {"label": "زر كود bot", "callback": "run_bot_code", "bot_code": ("send_message", {"text": "الرسالة المرسلة من زر كود bot"})}
+                            {"label": "زر كود bot", "callback": "run_bot_code", "bot_code": ["send_message", {"text": "الرسالة المرسلة من زر كود bot"}]}
                         ]
                     }
                 ]
@@ -197,40 +200,45 @@ async def callback_handler(call):
     if not found:
         await bot.answer_callback_query(call.id)
 
-@app.route('/')
+@app.get("/", response_class=HTMLResponse)
 async def home():
     return "Bot is running..."
 
-@app.route('/webhook', methods=['POST'])
-async def webhook():
+@app.post("/webhook")
+async def webhook(request: Request):
     if request.headers.get('content-type') == 'application/json':
-        json_string = request.get_data().decode('utf-8')
-        update = Update.de_json(json_string)
-        asyncio.create_task(bot.process_new_updates([update]))
-        return jsonify({'status': 'ok'})
-    return jsonify({'status': 'error', 'message': 'Invalid content type'})
+        json_string = await request.body()
+        update = Update.de_json(json_string.decode('utf-8'))
+        await bot.process_new_updates([update])
+        return JSONResponse(content={'status': 'ok'})
+    raise HTTPException(status_code=400, detail="Invalid content type")
 
-@app.route('/webapp')
-def webapp():
-    return render_template('webapp.html')
+@app.get("/webapp", response_class=HTMLResponse)
+def webapp(request: Request):
+    return templates.TemplateResponse("webapp.html", {"request": request})
 
-@app.route('/get_data', methods=['GET'])
+@app.get("/get_data")
 def api_get_data():
     data = get_data()
-    return jsonify(data)
+    return JSONResponse(content=data)
 
-@app.route('/update_data', methods=['POST'])
-def api_update_data():
-    new_data = request.json
-    if new_data:
-        update_data(new_data)
-        return jsonify({"status": "success", "message": "تم تحديث البيانات بنجاح."})
-    return jsonify({"status": "error", "message": "بيانات غير صالحة"}), 400
+@app.post("/update_data")
+async def api_update_data(request: Request):
+    try:
+        new_data = await request.json()
+        if new_data:
+            update_data(new_data)
+            return JSONResponse(content={"status": "success", "message": "تم تحديث البيانات بنجاح."})
+        return JSONResponse(content={"status": "error", "message": "بيانات غير صالحة"}), 400
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON format")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 async def set_webhook():
     webhook_url = "https://hanet-bot.vercel.app/webhook"
     await bot.set_webhook(url=webhook_url)
 
-if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+@app.on_event("startup")
+async def on_startup():
+    await set_webhook()
