@@ -214,6 +214,23 @@ async def webhook():
 def webapp():
     return render_template('webapp.html')
 
+@app.route('/get_data', methods=['GET'])
+def api_get_data():
+    data = get_data()
+    return jsonify(data)
+
+@app.route('/update_data', methods=['POST'])
+def api_update_data():
+    new_data = request.json
+    if new_data:
+        update_data(new_data)
+        return jsonify({"status": "success", "message": "تم تحديث البيانات بنجاح."})
+    return jsonify({"status": "error", "message": "بيانات غير صالحة"}), 400
+
+async def set_webhook():
+    webhook_url = "https://hanet-bot.vercel.app/webhook"
+    await bot.set_webhook(url=webhook_url)
+
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     app.run(host='0.0.0.0', port=5000, debug=True)
