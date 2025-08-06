@@ -19,8 +19,11 @@ r = redis.Redis(
     password="LszSeLOwYQd6A6nGeinRuY0TrJlRR9nx",
 )
 
+DATA_KEY = "bot_core"
+STATS_KEY = "bot_stats"
+
 def get_data():
-    raw = r.get("bot_core")
+    raw = r.get(DATA_KEY)
     if not raw:
         default = {
             "start_message": "أهلاً بك في البوت! اختر زراً لبدء تجربة الرسائل العشوائية.",
@@ -34,6 +37,14 @@ def get_data():
                         "نص عشوائي ٣"
                     ],
                     "inline_keyboard": []
+                },
+                {
+                    "label": "رسالة نصية ثابتة مع رابط",
+                    "action": "send_fixed_text",
+                    "text": "زوروا موقعنا: https://example.com",
+                    "inline_keyboard": [
+                        {"label": "زيارة الموقع", "url": "https://example.com"}
+                    ]
                 },
                 {
                     "label": "أرسل صورة عشوائية",
@@ -55,19 +66,39 @@ def get_data():
                     "inline_keyboard": []
                 },
                 {
-                    "label": "أرسل ملف",
+                    "label": "أرسل ملف PDF",
                     "action": "send_document",
                     "document": "https://file-examples-com.github.io/uploads/2017/10/file_example_PDF_1MB.pdf",
+                    "inline_keyboard": []
+                },
+                {
+                    "label": "أرسل ملف صوت",
+                    "action": "send_audio",
+                    "audio": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+                    "inline_keyboard": []
+                },
+                {
+                    "label": "أرسل ملصق ثابت",
+                    "action": "send_sticker",
+                    "sticker": "CAACAgIAAxkBAAEIYtdjkhc3-rD14LvNk8W1sFGXhQzRsAAC1gADVp29CtL1PC1dLEZQHwQ",
                     "inline_keyboard": []
                 }
             ]
         }
-        r.set("bot_core", json.dumps(default))
+        r.set(DATA_KEY, json.dumps(default))
         return default
     return json.loads(raw)
 
 def update_data(data):
-    r.set("bot_core", json.dumps(data))
+    r.set(DATA_KEY, json.dumps(data))
+
+def increment_stat(field:str):
+    r.hincrby(STATS_KEY, field, 1)
+
+def get_stats():
+    stats = r.hgetall(STATS_KEY)
+    # تأكد من تحويل القيم لأعداد صحيحية أو 0
+    return {k: int(v) for k, v in stats.items()} if stats else {}
 
 def create_reply_keyboard():
     data = get_data()
@@ -89,17 +120,21 @@ def create_inline_keyboard(buttons):
 
 @bot.message_handler(commands=['start'])
 async def start_handler(msg):
+    increment_stat("start_count")
     d = get_data()
     await bot.send_message(msg.chat.id, d["start_message"], reply_markup=create_reply_keyboard())
 
 @bot.message_handler(func=lambda m: True)
 async def general_handler(msg):
+    increment_stat("message_count")
     text = msg.text
     d = get_data()
     for btn in d["reply_buttons"]:
         if btn["label"] == text:
             chat_id = msg.chat.id
-            if btn["action"] == "send_random_text":
+            action = btn.get("action")
+
+            if action == "send_random_text":
                 txt = random.choice(btn["texts"]) if "texts" in btn else "نص ثابت"
                 if btn.get("inline_keyboard"):
                     kb = create_inline_keyboard(btn["inline_keyboard"])
@@ -107,7 +142,17 @@ async def general_handler(msg):
                 else:
                     await bot.send_message(chat_id, txt)
                 return
-            if btn["action"] == "send_random_photo":
+
+            if action == "send_fixed_text":
+                txt = btn.get("text", "نص ثابت")
+                if btn.get("inline_keyboard"):
+                    kb = create_inline_keyboard(btn["inline_keyboard"])
+                    await bot.send_message(chat_id, txt, reply_markup=kb)
+                else:
+                    await bot.send_message(chat_id, txt)
+                return
+
+            if action == "send_random_photo":
                 photo = random.choice(btn["photos"]) if "photos" in btn else None
                 if photo:
                     if btn.get("inline_keyboard"):
@@ -116,7 +161,8 @@ async def general_handler(msg):
                     else:
                         await bot.send_photo(chat_id, photo=photo)
                 return
-            if btn["action"] == "send_video":
+
+            if action == "send_video":
                 vid = btn.get("video")
                 if vid:
                     if btn.get("inline_keyboard"):
@@ -125,7 +171,8 @@ async def general_handler(msg):
                     else:
                         await bot.send_video(chat_id, video=vid)
                 return
-            if btn["action"] == "send_document":
+
+            if action == "send_document":
                 doc = btn.get("document")
                 if doc:
                     if btn.get("inline_keyboard"):
@@ -133,6 +180,22 @@ async def general_handler(msg):
                         await bot.send_document(chat_id, document=doc, reply_markup=kb)
                     else:
                         await bot.send_document(chat_id, document=doc)
+                return
+
+            if action == "send_audio":
+                audio = btn.get("audio")
+                if audio:
+                    if btn.get("inline_keyboard"):
+                        kb = create_inline_keyboard(btn["inline_keyboard"])
+                        await bot.send_audio(chat_id, audio=audio, reply_markup=kb)
+                    else:
+                        await bot.send_audio(chat_id, audio=audio)
+                return
+
+            if action == "send_sticker":
+                sticker = btn.get("sticker")
+                if sticker:
+                    await bot.send_sticker(chat_id, sticker=sticker)
                 return
 
 @bot.callback_query_handler(func=lambda call: True)
@@ -164,7 +227,10 @@ async def api_post_data(request: Request):
     except Exception:
         raise HTTPException(400, "Invalid JSON")
 
+@app.get("/api/stats")
+async def api_get_stats():
+    return get_stats()
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-                    
