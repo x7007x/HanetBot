@@ -48,9 +48,6 @@ def build_inline_keyboard(inline_kbd_data):
                 else:
                     buttons.append(InlineKeyboardButton(text=text, callback_data=text))
 
-            elif btn_type == "pay":
-                buttons.append(InlineKeyboardButton(text=text, pay=True))
-
             else:
                 buttons.append(InlineKeyboardButton(text=text, callback_data=text))
 
@@ -58,58 +55,12 @@ def build_inline_keyboard(inline_kbd_data):
 
     return inline_keyboard
 
-
-@app.on_event("startup")
-async def startup_event():
-    data = {
-        "start_message": "Hello",
-        "main_keyboard": [
-            {
-                "label": "button 1",
-                "action": "send_message",
-                "content": [
-                    {"text": "Hello ¹"},
-                    {"text": "Hello ²"}
-                ],
-                "inline_keyboard": [
-                    [
-                        {"text": "URL Button", "type": "url", "value": "https://t.me"},
-                        {"text": "Callback Button", "type": "callback_data", "value": "callback_1"}
-                    ],
-                    [
-                        {"text": "Switch Inline Query", "type": "switch_inline_query", "value": "query"},
-                        {"text": "Switch Inline Query Current Chat", "type": "switch_inline_query_current_chat", "value": "query_current"}
-                    ],
-                    [
-                        {"text": "WebApp Button", "type": "web_app", "value": {"url": "https://yourwebappurl.com"}}
-                    ],
-                    [
-                        {"text": "Pay Button", "type": "pay", "value": True}
-                    ]
-                ]
-            },
-            {
-                "label": "button 2",
-                "action": "send_photo",
-                "content": [
-                    {"photo": "https://files.catbox.moe/wfnud7.jpg", "caption": "Caption 1"},
-                    {"photo": "https://files.catbox.moe/i6dj6j.jpg", "caption": "Caption 2"}
-                ],
-                "inline_keyboard": []
-            }
-        ]
-    }
-
-    await r.set("bot_data", json.dumps(data))
-
-
 @app.post("/webhook")
 async def telegram_webhook(request: Request):
     json_update = await request.json()
     update = telebot.types.Update.de_json(json_update)
     await bot.process_new_updates([update])
     return Response(status_code=200)
-
 
 @bot.message_handler(commands=['start', 'help'])
 async def send_welcome(message):
@@ -172,3 +123,38 @@ async def handle_buttons(message):
 
     await method(message.chat.id, **kwargs)
 
+data = {
+    "start_message": "Hello",
+    "main_keyboard": [
+        {
+            "label": "button 1",
+            "action": "send_message",
+            "content": [
+                {"text": "Hello ¹"},
+                {"text": "Hello ²"}
+            ],
+            "inline_keyboard": [
+                [
+                    {"text": "URL Button", "type": "url", "value": "https://t.me"},
+                    {"text": "Callback Button", "type": "callback_data", "value": "callback_1"}
+                ],
+                [
+                    {"text": "Switch Inline Query", "type": "switch_inline_query", "value": "query"},
+                    {"text": "Switch Inline Query Current Chat", "type": "switch_inline_query_current_chat", "value": "query_current"}
+                ],
+                [
+                    {"text": "WebApp Button", "type": "web_app", "value": {"url": "https://yourwebappurl.com"}}
+                ]
+            ]
+        },
+        {
+            "label": "button 2",
+            "action": "send_photo",
+            "content": [
+                {"photo": "https://files.catbox.moe/wfnud7.jpg", "caption": "Caption 1"},
+                {"photo": "https://files.catbox.moe/i6dj6j.jpg", "caption": "Caption 2"}
+            ],
+            "inline_keyboard": []
+        }
+    ]
+}
