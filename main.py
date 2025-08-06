@@ -16,12 +16,12 @@ r = redis.from_url(
 
 app = FastAPI()
 
-def build_inline_keyboard(inline_keyboard_data):
-    if not inline_keyboard_data:
+def build_inline_keyboard(inline_kbd_data):
+    if not inline_kbd_data:
         return None
 
     inline_keyboard = InlineKeyboardMarkup()
-    for row in inline_keyboard_data:
+    for row in inline_kbd_data:
         buttons = []
         for b in row:
             btn_type = b.get("type")
@@ -103,13 +103,11 @@ async def startup_event():
     await r.set("bot_data", json.dumps(data))
 
 
-
-@app.post("/webhook/")
+@app.post("/webhook")
 async def telegram_webhook(request: Request):
     json_update = await request.json()
     update = telebot.types.Update.de_json(json_update)
     await bot.process_new_updates([update])
-
     return Response(status_code=200)
 
 
@@ -155,8 +153,8 @@ async def handle_buttons(message):
 
     action = item.get("action")
     content = item.get("content", [])
-    inline_keyboard_data = item.get("inline_keyboard", [])
-    inline_keyboard = build_inline_keyboard(inline_keyboard_data)
+    inline_kbd_data = item.get("inline_keyboard", [])
+    inline_keyboard = build_inline_keyboard(inline_kbd_data)
 
     if not content:
         await bot.send_message(message.chat.id, "No content to send")
