@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, HTTPException, Response
 from telebot.async_telebot import AsyncTeleBot
 from telebot.types import (
     ReplyKeyboardMarkup, KeyboardButton,
@@ -105,14 +105,13 @@ async def ping():
     return {"status": "ok"}
 
 @app.post("/save_data")
-async def save_data(data):
-    json_data = data.json()
+async def save_data(request: Request):
+    json_data = await request.json()
     try:
-        r.set("bot_data", json_data)
+        r.set("bot_data", json.dumps(json_data))
         return {"status": "success", "message": "Data saved to Redis"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error saving data: {e}")
-
 @app.get("/get_data")
 async def get_data():
     raw = r.get("bot_data")
