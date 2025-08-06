@@ -104,36 +104,19 @@ async def all_messages(message):
 async def ping():
     return {"status": "ok"}
 
+@app.post("/save_data")
+async def save_data(data):
+    json_data = data.json()
+    try:
+        r.set("bot_data", json_data)
+        return {"status": "success", "message": "Data saved to Redis"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error saving data: {e}")
 
-# Preload bot data into Redis synchronously - run once before or deploy-time
-data = {
-    "start_message": "Hello",
-    "main_keyboard": [
-        {
-            "label": "button 1",
-            "action": "send_message",
-            "content": [{"text": "Hello ¹"}, {"text": "Hello ²"}],
-            "inline_keyboard": [
-                [
-                    {"text": "URL Button", "type": "url", "value": "https://t.me"},
-                    {"text": "Callback Button", "type": "callback_data", "value": "callback_1"},
-                ],
-                [
-                    {"text": "Switch Inline Query", "type": "switch_inline_query", "value": "query"},
-                    {"text": "Switch Inline Query Current Chat", "type": "switch_inline_query_current_chat", "value": "query_current"},
-                ],
-                [{"text": "WebApp Button", "type": "web_app", "value": {"url": "https://yourwebappurl.com"}}],
-            ],
-        },
-        {
-            "label": "button 2",
-            "action": "send_photo",
-            "content": [
-                {"photo": "https://files.catbox.moe/wfnud7.jpg", "caption": "Caption 1"},
-                {"photo": "https://files.catbox.moe/i6dj6j.jpg", "caption": "Caption 2"},
-            ],
-            "inline_keyboard": [],
-        },
-    ],
-}
-r.set("bot_data", json.dumps(data))
+@app.get("/get_data")
+async def get_data():
+    raw = r.get("bot_data")
+    if not raw:
+        raise HTTPException(status_code=404, detail="No data found in Redis")
+    data = json.loads(raw)
+    return data
