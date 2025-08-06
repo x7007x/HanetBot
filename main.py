@@ -1,236 +1,176 @@
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Request, Response
 from telebot.async_telebot import AsyncTeleBot
-from telebot.types import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, Update
-import redis
+from telebot.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+import redis.asyncio as redis
 import json
-import os
 import random
+import uvicorn
+import telebot.types
 
-app = FastAPI()
-bot_token = "8038936358:AAF-YxpGmXnoDLHG2sljx3fx79mFye9rwzY"
-bot = AsyncTeleBot(bot_token)
+TOKEN = "8038936358:AAF-YxpGmXnoDLHG2sljx3fx79mFye9rwzY"
+bot = AsyncTeleBot(TOKEN)
 
-r = redis.Redis(
-    host='redis-17683.c263.us-east-1-2.ec2.redns.redis-cloud.com',
-    port=17683,
-    decode_responses=True,
-    username="default",
-    password="LszSeLOwYQd6A6nGeinRuY0TrJlRR9nx",
+r = redis.from_url(
+    'redis://default:LszSeLOwYQd6A6nGeinRuY0TrJlRR9nx@redis-17683.c263.us-east-1-2.ec2.redns.redis-cloud.com:17683'
 )
 
-DATA_KEY = "bot_core"
-STATS_KEY = "bot_stats"
+app = FastAPI()
 
-def get_data():
-    raw = r.get(DATA_KEY)
-    if not raw:
-        default = {
-            "start_message": "أهلاً بك في البوت! اختر زراً لبدء تجربة الرسائل العشوائية.",
-            "reply_buttons": [
-                {
-                    "label": "رسالة نصية عشوائية",
-                    "action": "send_random_text",
-                    "texts": [
-                        "هذه رسالة نصية عشوائية ١",
-                        "رسالة نصية مختلفة ٢",
-                        "نص عشوائي ٣"
+def build_inline_keyboard(inline_keyboard_data):
+    if not inline_keyboard_data:
+        return None
+
+    inline_keyboard = InlineKeyboardMarkup()
+    for row in inline_keyboard_data:
+        buttons = []
+        for b in row:
+            btn_type = b.get("type")
+            text = b.get("text")
+
+            if btn_type == "url":
+                buttons.append(InlineKeyboardButton(text=text, url=b.get("value")))
+
+            elif btn_type == "callback_data":
+                buttons.append(InlineKeyboardButton(text=text, callback_data=b.get("value")))
+
+            elif btn_type == "switch_inline_query":
+                buttons.append(InlineKeyboardButton(text=text, switch_inline_query=b.get("value")))
+
+            elif btn_type == "switch_inline_query_current_chat":
+                buttons.append(InlineKeyboardButton(text=text, switch_inline_query_current_chat=b.get("value")))
+
+            elif btn_type == "web_app":
+                web_app_data = b.get("value", {})
+                url = web_app_data.get("url")
+                if url:
+                    web_app_obj = WebAppInfo(url=url)
+                    buttons.append(InlineKeyboardButton(text=text, web_app=web_app_obj))
+                else:
+                    buttons.append(InlineKeyboardButton(text=text, callback_data=text))
+
+            elif btn_type == "pay":
+                buttons.append(InlineKeyboardButton(text=text, pay=True))
+
+            else:
+                buttons.append(InlineKeyboardButton(text=text, callback_data=text))
+
+        inline_keyboard.row(*buttons)
+
+    return inline_keyboard
+
+
+@app.on_event("startup")
+async def startup_event():
+    data = {
+        "start_message": "Hello",
+        "main_keyboard": [
+            {
+                "label": "button 1",
+                "action": "send_message",
+                "content": [
+                    {"text": "Hello ¹"},
+                    {"text": "Hello ²"}
+                ],
+                "inline_keyboard": [
+                    [
+                        {"text": "URL Button", "type": "url", "value": "https://t.me"},
+                        {"text": "Callback Button", "type": "callback_data", "value": "callback_1"}
                     ],
-                    "inline_keyboard": []
-                },
-                {
-                    "label": "رسالة نصية ثابتة مع رابط",
-                    "action": "send_fixed_text",
-                    "text": "زوروا موقعنا: https://example.com",
-                    "inline_keyboard": [
-                        {"label": "زيارة الموقع", "url": "https://example.com"}
-                    ]
-                },
-                {
-                    "label": "أرسل صورة عشوائية",
-                    "action": "send_random_photo",
-                    "photos": [
-                        "https://placekitten.com/400/300",
-                        "https://placebear.com/400/300"
+                    [
+                        {"text": "Switch Inline Query", "type": "switch_inline_query", "value": "query"},
+                        {"text": "Switch Inline Query Current Chat", "type": "switch_inline_query_current_chat", "value": "query_current"}
                     ],
-                    "inline_keyboard": [
-                        {"label": "زيارة موقع", "url": "https://example.com"},
-                        {"label": "فتح ويب اب", "web_app_url": "https://tailwindcss.com"},
-                        {"label": "زر رجوع", "callback": "go_back"}
+                    [
+                        {"text": "WebApp Button", "type": "web_app", "value": {"url": "https://yourwebappurl.com"}}
+                    ],
+                    [
+                        {"text": "Pay Button", "type": "pay", "value": True}
                     ]
-                },
-                {
-                    "label": "أرسل فيديو ثابت",
-                    "action": "send_video",
-                    "video": "http://techslides.com/demos/sample-videos/small.mp4",
-                    "inline_keyboard": []
-                },
-                {
-                    "label": "أرسل ملف PDF",
-                    "action": "send_document",
-                    "document": "https://file-examples-com.github.io/uploads/2017/10/file_example_PDF_1MB.pdf",
-                    "inline_keyboard": []
-                },
-                {
-                    "label": "أرسل ملف صوت",
-                    "action": "send_audio",
-                    "audio": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-                    "inline_keyboard": []
-                },
-                {
-                    "label": "أرسل ملصق ثابت",
-                    "action": "send_sticker",
-                    "sticker": "CAACAgIAAxkBAAEIYtdjkhc3-rD14LvNk8W1sFGXhQzRsAAC1gADVp29CtL1PC1dLEZQHwQ",
-                    "inline_keyboard": []
-                }
-            ]
-        }
-        r.set(DATA_KEY, json.dumps(default))
-        return default
-    return json.loads(raw)
+                ]
+            },
+            {
+                "label": "button 2",
+                "action": "send_photo",
+                "content": [
+                    {"photo": "https://files.catbox.moe/wfnud7.jpg", "caption": "Caption 1"},
+                    {"photo": "https://files.catbox.moe/i6dj6j.jpg", "caption": "Caption 2"}
+                ],
+                "inline_keyboard": []
+            }
+        ]
+    }
 
-def update_data(data):
-    r.set(DATA_KEY, json.dumps(data))
+    await r.set("bot_data", json.dumps(data))
 
-def increment_stat(field:str):
-    r.hincrby(STATS_KEY, field, 1)
 
-def get_stats():
-    stats = r.hgetall(STATS_KEY)
-    # تأكد من تحويل القيم لأعداد صحيحية أو 0
-    return {k: int(v) for k, v in stats.items()} if stats else {}
 
-def create_reply_keyboard():
-    data = get_data()
-    kb = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    for btn in data["reply_buttons"]:
-        kb.add(btn["label"])
-    return kb
+@app.post("/webhook/")
+async def telegram_webhook(request: Request):
+    json_update = await request.json()
+    update = telebot.types.Update.de_json(json_update)
+    await bot.process_new_updates([update])
 
-def create_inline_keyboard(buttons):
-    kb = InlineKeyboardMarkup()
-    for b in buttons:
-        if "url" in b:
-            kb.add(InlineKeyboardButton(text=b["label"], url=b["url"]))
-        elif "web_app_url" in b:
-            kb.add(InlineKeyboardButton(text=b["label"], web_app=WebAppInfo(url=b["web_app_url"])))
-        else:
-            kb.add(InlineKeyboardButton(text=b["label"], callback_data=b["callback"]))
-    return kb
+    return Response(status_code=200)
 
-@bot.message_handler(commands=['start'])
-async def start_handler(msg):
-    increment_stat("start_count")
-    d = get_data()
-    await bot.send_message(msg.chat.id, d["start_message"], reply_markup=create_reply_keyboard())
+
+@bot.message_handler(commands=['start', 'help'])
+async def send_welcome(message):
+    data_raw = await r.get("bot_data")
+    if not data_raw:
+        await bot.send_message(message.chat.id, "No data found in redis.")
+        return
+
+    data = json.loads(data_raw)
+    start_message = data.get("start_message", "")
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2, one_time_keyboard=True)
+
+    buttons = []
+    for btn in data.get("main_keyboard", []):
+        buttons.append(KeyboardButton(btn["label"]))
+
+    keyboard.add(*buttons)
+    await bot.send_message(message.chat.id, start_message, reply_markup=keyboard)
+
 
 @bot.message_handler(func=lambda m: True)
-async def general_handler(msg):
-    increment_stat("message_count")
-    text = msg.text
-    d = get_data()
-    for btn in d["reply_buttons"]:
-        if btn["label"] == text:
-            chat_id = msg.chat.id
-            action = btn.get("action")
+async def handle_buttons(message):
+    data_raw = await r.get("bot_data")
+    if not data_raw:
+        await bot.send_message(message.chat.id, "No data found in redis.")
+        return
 
-            if action == "send_random_text":
-                txt = random.choice(btn["texts"]) if "texts" in btn else "نص ثابت"
-                if btn.get("inline_keyboard"):
-                    kb = create_inline_keyboard(btn["inline_keyboard"])
-                    await bot.send_message(chat_id, txt, reply_markup=kb)
-                else:
-                    await bot.send_message(chat_id, txt)
-                return
+    data = json.loads(data_raw)
+    main_keyboard = data.get("main_keyboard", [])
+    label = message.text
 
-            if action == "send_fixed_text":
-                txt = btn.get("text", "نص ثابت")
-                if btn.get("inline_keyboard"):
-                    kb = create_inline_keyboard(btn["inline_keyboard"])
-                    await bot.send_message(chat_id, txt, reply_markup=kb)
-                else:
-                    await bot.send_message(chat_id, txt)
-                return
+    item = None
+    for x in main_keyboard:
+        if x["label"] == label:
+            item = x
+            break
 
-            if action == "send_random_photo":
-                photo = random.choice(btn["photos"]) if "photos" in btn else None
-                if photo:
-                    if btn.get("inline_keyboard"):
-                        kb = create_inline_keyboard(btn["inline_keyboard"])
-                        await bot.send_photo(chat_id, photo=photo, reply_markup=kb)
-                    else:
-                        await bot.send_photo(chat_id, photo=photo)
-                return
+    if not item:
+        await bot.send_message(message.chat.id, "Unknown command or button")
+        return
 
-            if action == "send_video":
-                vid = btn.get("video")
-                if vid:
-                    if btn.get("inline_keyboard"):
-                        kb = create_inline_keyboard(btn["inline_keyboard"])
-                        await bot.send_video(chat_id, video=vid, reply_markup=kb)
-                    else:
-                        await bot.send_video(chat_id, video=vid)
-                return
+    action = item.get("action")
+    content = item.get("content", [])
+    inline_keyboard_data = item.get("inline_keyboard", [])
+    inline_keyboard = build_inline_keyboard(inline_keyboard_data)
 
-            if action == "send_document":
-                doc = btn.get("document")
-                if doc:
-                    if btn.get("inline_keyboard"):
-                        kb = create_inline_keyboard(btn["inline_keyboard"])
-                        await bot.send_document(chat_id, document=doc, reply_markup=kb)
-                    else:
-                        await bot.send_document(chat_id, document=doc)
-                return
+    if not content:
+        await bot.send_message(message.chat.id, "No content to send")
+        return
 
-            if action == "send_audio":
-                audio = btn.get("audio")
-                if audio:
-                    if btn.get("inline_keyboard"):
-                        kb = create_inline_keyboard(btn["inline_keyboard"])
-                        await bot.send_audio(chat_id, audio=audio, reply_markup=kb)
-                    else:
-                        await bot.send_audio(chat_id, audio=audio)
-                return
+    chosen = random.choice(content)
+    method = getattr(bot, action, None)
+    if not callable(method):
+        await bot.send_message(message.chat.id, "Unknown action")
+        return
 
-            if action == "send_sticker":
-                sticker = btn.get("sticker")
-                if sticker:
-                    await bot.send_sticker(chat_id, sticker=sticker)
-                return
+    kwargs = dict(chosen)
+    if inline_keyboard:
+        kwargs["reply_markup"] = inline_keyboard
 
-@bot.callback_query_handler(func=lambda call: True)
-async def callback_handler(call):
-    if call.data == "go_back":
-        d = get_data()
-        await bot.edit_message_text(d["start_message"], chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=create_reply_keyboard())
-    await bot.answer_callback_query(call.id)
+    await method(message.chat.id, **kwargs)
 
-@app.post("/webhook")
-async def webhook(request: Request):
-    if request.headers.get('content-type') == 'application/json':
-        data = await request.body()
-        update = Update.de_json(data.decode('utf-8'))
-        await bot.process_new_updates([update])
-        return JSONResponse({"status": "ok"})
-    raise HTTPException(400, "Invalid content-type")
-
-@app.get("/api/data")
-async def api_get_data():
-    return get_data()
-
-@app.post("/api/data")
-async def api_post_data(request: Request):
-    try:
-        new_data = await request.json()
-        update_data(new_data)
-        return {"status":"success"}
-    except Exception:
-        raise HTTPException(400, "Invalid JSON")
-
-@app.get("/api/stats")
-async def api_get_stats():
-    return get_stats()
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
