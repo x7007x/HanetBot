@@ -55,8 +55,11 @@ def build_inline_keyboard(inline_kbd_data):
 @app.on_message(filters.command(["start", "help"]))
 async def send_welcome(client, message):
     if message.from_user.id in [5719372657, 6383967261]:
-        keyboard = InlineKeyboardMarkup(InlineKeyboardButton(text="اضغط هنا", web_app=WebAppInfo(url="https://hanet-bot.vercel.app/webapp")))
-        await message.reply_text("- Control panel By Ahmed Negm", reply_markup=keyboard)
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("اضغط هنا", web_app=WebAppInfo(url="https://hanet-bot.vercel.app/webapp"))]])
+        await message.reply(
+            "- Control panel By Ahmed Negm", 
+            reply_markup=keyboard
+        )
 
     data_raw = r.get("bot_data")
     if not data_raw:
