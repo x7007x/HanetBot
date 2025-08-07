@@ -1,6 +1,4 @@
-fastapi
-uvicorn[standard]
-pyTelegramBotAPI[aio]
-redis[asyncio]
-jinja2
+pyrogram
+tgcrypto
+redis
 flask
