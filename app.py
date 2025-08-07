@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 import redis
 import json
 
@@ -15,6 +15,10 @@ def hello_world():
 @app.route('/ping', methods=['GET'])
 def ping():
     return jsonify({"status": "ok"})
+
+@app.route("/webapp")
+def webapp():
+    return render_template("index.html")
 
 @app.route('/save_data', methods=['POST'])
 def save_data():
