@@ -65,6 +65,9 @@
         .smooth-transition {
             transition: all 0.2s ease;
         }
+        * {
+        	outline: none
+        }
     </style>
 </head>
 <body class="font-arabic bg-gray-50 min-h-screen">
@@ -93,7 +96,7 @@
             <!-- Start Message Section -->
             <div class="bg-white border border-gray-200 rounded-xl p-4">
                 <h2 class="text-lg font-semibold text-gray-900 mb-3">رسالة البداية</h2>
-                <textarea id="startMessage" class="w-full p-3 border border-gray-300 rounded-lg resize-none smooth-transition focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="3" placeholder="أدخل رسالة البداية...">مرحباً</textarea>
+                <textarea id="startMessage" class="w-full p-3 border border-gray-300 rounded-lg resize-none smooth-transition" rows="3" placeholder="أدخل رسالة البداية...">مرحباً</textarea>
             </div>
 
             <!-- Main Keyboard Section -->
@@ -122,13 +125,13 @@
                     <!-- Button Label -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">تسمية الزر</label>
-                        <input type="text" id="buttonLabel" class="w-full p-3 border border-gray-300 rounded-lg smooth-transition focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="أدخل تسمية الزر">
+                        <input type="text" id="buttonLabel" class="w-full p-3 border border-gray-300 rounded-lg smooth-transition" placeholder="أدخل تسمية الزر">
                     </div>
 
                     <!-- Action Type -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">نوع الإجراء</label>
-                        <select id="actionType" class="w-full p-3 border border-gray-300 rounded-lg smooth-transition focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <select id="actionType" class="w-full p-3 border border-gray-300 rounded-lg smooth-transition">
                             <option value="send_message">إرسال رسالة</option>
                             <option value="send_photo">إرسال صورة</option>
                             <option value="send_video">إرسال فيديو</option>
@@ -366,35 +369,44 @@
             }
 
             getContentFieldsHTML(actionType) {
-                switch (actionType) {
-                    case 'send_message':
-                        return '<input type="text" class="content-text w-full p-2 border border-gray-300 rounded smooth-transition focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="النص">';
-                    case 'send_photo':
-                        return `
-                            <input type="url" class="content-photo w-full p-2 border border-gray-300 rounded mb-2 smooth-transition focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="رابط الصورة">
-                            <input type="text" class="content-caption w-full p-2 border border-gray-300 rounded smooth-transition focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="التعليق (اختياري)">
-                        `;
-                    case 'send_video':
-                        return `
-                            <input type="url" class="content-video w-full p-2 border border-gray-300 rounded mb-2 smooth-transition focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="رابط الفيديو">
-                            <input type="text" class="content-caption w-full p-2 border border-gray-300 rounded smooth-transition focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="التعليق (اختياري)">
-                        `;
-                    case 'send_document':
-                        return `
-                            <input type="url" class="content-document w-full p-2 border border-gray-300 rounded mb-2 smooth-transition focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="رابط المستند">
-                            <input type="text" class="content-caption w-full p-2 border border-gray-300 rounded smooth-transition focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="التعليق (اختياري)">
-                        `;
-                    case 'send_sticker':
-                        return '<input type="url" class="content-sticker w-full p-2 border border-gray-300 rounded smooth-transition focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="رابط الملصق">';
-                    case 'send_audio':
-                        return `
-                            <input type="url" class="content-audio w-full p-2 border border-gray-300 rounded mb-2 smooth-transition focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="رابط الصوت">
-                            <input type="text" class="content-caption w-full p-2 border border-gray-300 rounded smooth-transition focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="التعليق (اختياري)">
-                        `;
-                    default:
-                        return '';
-                }
-            }
+    const baseInput = "w-full p-2 border border-gray-300 rounded mb-2 smooth-transition focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
+    const baseTextarea = "w-full p-2 border border-gray-300 rounded mb-2 smooth-transition focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
+
+    switch (actionType) {
+        case 'send_message':
+            return `<textarea rows="5" class="content-text ${baseTextarea}" placeholder="النص"></textarea>`;
+        
+        case 'send_photo':
+            return `
+                <textarea rows="5" class="content-photo ${baseTextarea}" placeholder="رابط الصورة"></textarea>
+                <input type="text" class="content-caption ${baseInput}" placeholder="التعليق (اختياري)">
+            `;
+        
+        case 'send_video':
+            return `
+                <textarea rows="5" class="content-video ${baseTextarea}" placeholder="رابط الفيديو"></textarea>
+                <input type="text" class="content-caption ${baseInput}" placeholder="التعليق (اختياري)">
+            `;
+        
+        case 'send_document':
+            return `
+                <textarea rows="5" class="content-document ${baseTextarea}" placeholder="رابط المستند"></textarea>
+                <input type="text" class="content-caption ${baseInput}" placeholder="التعليق (اختياري)">
+            `;
+        
+        case 'send_sticker':
+            return `<textarea rows="5" class="content-sticker ${baseTextarea}" placeholder="رابط الملصق"></textarea>`;
+        
+        case 'send_audio':
+            return `
+                <textarea rows="5" class="content-audio ${baseTextarea}" placeholder="رابط الصوت"></textarea>
+                <input type="text" class="content-caption ${baseInput}" placeholder="التعليق (اختياري)">
+            `;
+        
+        default:
+            return '';
+    }
+}
 
             addContentItem(content = null, index = null) {
                 const container = document.getElementById('contentContainer');
@@ -488,15 +500,15 @@
                         <button onclick="this.parentElement.parentElement.remove()" class="text-red-500 hover:text-red-700 smooth-transition text-xs">حذف</button>
                     </div>
                     <div class="space-y-2">
-                        <input type="text" class="inline-text w-full p-2 border border-gray-300 rounded text-sm smooth-transition focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="نص الزر">
-                        <select class="inline-type w-full p-2 border border-gray-300 rounded text-sm smooth-transition focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <input type="text" class="inline-text w-full p-2 border border-gray-300 rounded text-sm smooth-transition" placeholder="نص الزر">
+                        <select class="inline-type w-full p-2 border border-gray-300 rounded text-sm smooth-transition">
                             <option value="url">رابط</option>
                             <option value="callback_data">بيانات الاستدعاء</option>
                             <option value="switch_inline_query">استعلام مضمن</option>
                             <option value="switch_inline_query_current_chat">استعلام مضمن (الدردشة الحالية)</option>
                             <option value="web_app">تطبيق ويب</option>
                         </select>
-                        <input type="text" class="inline-value w-full p-2 border border-gray-300 rounded text-sm smooth-transition focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="القيمة">
+                        <input type="text" class="inline-value w-full p-2 border border-gray-300 rounded text-sm smooth-transition" placeholder="القيمة">
                     </div>
                 `;
                 
